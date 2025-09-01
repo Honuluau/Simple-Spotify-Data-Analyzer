@@ -2,6 +2,7 @@ import json
 import glob
 import sys
 import os.path
+import requests
 from datetime import datetime
 from dataclasses import dataclass
 from tkinter.filedialog import askopenfilename
@@ -20,6 +21,18 @@ class Artist:
     songs_played: int
     songs: list
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 class TimeFormater:
     def ms_to_hmsms(self, ms):
         hours = ms // 3_600_000
@@ -28,7 +41,7 @@ class TimeFormater:
         ms_remaining = ms_remaining % 60_000
         seconds = ms_remaining // 1_000
         milliseconds = ms_remaining % 1_000
-        return f"{hours}h {minutes}m {seconds}s {milliseconds}ms"
+        return f'{hours}h {minutes}m {seconds}s {milliseconds}ms'
 
 class StreamingHistoryMusicReader:
     def __init__(self, url):
@@ -53,7 +66,7 @@ class StreamingHistoryMusicReader:
                            [
                            [
                                entry['msPlayed'],
-                               datetime.strptime(entry['endTime'], "%Y-%m-%d %H:%M")
+                               datetime.strptime(entry['endTime'], '%Y-%m-%d %H:%M')
                            ]
                            ])
                     else:
@@ -61,7 +74,7 @@ class StreamingHistoryMusicReader:
                         songs[entry['trackName']].listens_list.append([
                             [
                                 entry['msPlayed'],
-                                datetime.strptime(entry['endTime'], "%Y-%m-%d %H:%M")
+                                datetime.strptime(entry['endTime'], '%Y-%m-%d %H:%M')
                             ]
                         ])
 
@@ -98,15 +111,50 @@ class StreamingHistoryMusicReader:
         sorted_artists = sorted(self.artists.values(), key=lambda s: s.songs_played, reverse=longest)
         return sorted_artists
 
+class VersionControl:
+    def __init__(self):
+        self.current_version = self.get_current_version()
+        self.recent_version = self.get_recent_version()
+
+    def get_current_version(self):
+        with open('version.json', mode='r') as file:
+            data = json.load(file)
+            self.current_version = data['version']
+            return data['version']
+
+    # Eventually come back to make it compatible with being offline.
+    def get_recent_version(self):
+        try:
+            response = requests.get('https://raw.githubusercontent.com/Honuluau/Simple-Spotify-Data-Analyzer/refs/heads/master/version.json')
+            self.recent_version = response.json()['version']
+            return self.recent_version
+        except Exception as e:
+            print(f'{bcolors.FAIL}Failed to grab latest version, setting most recent version to current version.{bcolors.ENDC}')
+            return self.get_current_version()
+
+
+    def compare_version(self):
+        if self.current_version != self.recent_version:
+            print(f'{bcolors.FAIL}VERSION MISMATCH: Current (v{self.current_version}), Most Recent: (v{self.recent_version}){bcolors.ENDC}')
+            return False
+        else:
+            print(f'{bcolors.OKGREEN}VERSION MATCH: Current (v{self.current_version}), Most Recent: (v{self.recent_version}){bcolors.ENDC}')
+            return True
+
 def main():
+    version_control = VersionControl()
+    if not version_control.compare_version():
+        input("Press anything to close.")
+        os.system('exit')
+
     print(f'Open any json file within the Spotify Data Folder')
-    data_directory = os.path.dirname(askopenfilename(title="Select Spotify Data Folder", filetypes=[("Any Spotify Data Json File", ".json")]))
+    data_directory = os.path.dirname(askopenfilename(title='Select Spotify Data Folder', filetypes=[('Any Spotify Data Json File', '.json')]))
 
     music_reader = StreamingHistoryMusicReader(data_directory)
     most_played_artists = music_reader.sort_most_played_artists(True)
 
     for artist in most_played_artists:
-        print(f"{artist.name} - {artist.songs_played} times played.")
+        print(f'{artist.name} - {artist.songs_played} times played.')
 
     sys.exit(1)
 
