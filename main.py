@@ -3,6 +3,7 @@ import glob
 import sys
 import os.path
 import requests
+from tqdm import tqdm
 from datetime import datetime
 from dataclasses import dataclass
 from tkinter.filedialog import askopenfilename
@@ -21,7 +22,7 @@ class Artist:
     songs_played: int
     songs: list
 
-class bcolors:
+class BColors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'
@@ -31,7 +32,6 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
-
 
 class TimeFormater:
     def ms_to_hmsms(self, ms):
@@ -83,17 +83,17 @@ class StreamingHistoryMusicReader:
 
     def get_artists(self):
         artists = {}
-        for song in self.songs:
+        for song in tqdm(self.songs):
             track = self.songs[song]
             if track.artist not in artists:
                 artists[track.artist] = Artist(
                     track.artist,
                     track.ms_played,
-                    1,
+                    len(track.listens_list),
                     [track]
                 )
             else:
-                artists[track.artist].songs_played += 1
+                artists[track.artist].songs_played += len(track.listens_list)
                 artists[track.artist].ms_played += track.ms_played
                 artists[track.artist].songs.append(track)
 
@@ -124,21 +124,22 @@ class VersionControl:
 
     # Eventually come back to make it compatible with being offline.
     def get_recent_version(self):
+        print(f'Checking version..')
         try:
             response = requests.get('https://raw.githubusercontent.com/Honuluau/Simple-Spotify-Data-Analyzer/refs/heads/master/version.json')
             self.recent_version = response.json()['version']
             return self.recent_version
         except Exception as e:
-            print(f'{bcolors.FAIL}Failed to grab latest version, setting most recent version to current version.{bcolors.ENDC}')
+            print(f'{BColors.FAIL}Failed to grab latest version, setting most recent version to current version.{BColors.ENDC}')
             return self.get_current_version()
 
 
     def compare_version(self):
         if self.current_version != self.recent_version:
-            print(f'{bcolors.FAIL}VERSION MISMATCH: Current (v{self.current_version}), Most Recent: (v{self.recent_version}){bcolors.ENDC}')
+            print(f'{BColors.FAIL}VERSION MISMATCH: Current (v{self.current_version}), Most Recent: (v{self.recent_version}){BColors.ENDC}')
             return False
         else:
-            print(f'{bcolors.OKGREEN}VERSION MATCH: Current (v{self.current_version}), Most Recent: (v{self.recent_version}){bcolors.ENDC}')
+            print(f'{BColors.OKGREEN}VERSION MATCH: Current (v{self.current_version}), Most Recent: (v{self.recent_version}){BColors.ENDC}')
             return True
 
 def main():
@@ -151,10 +152,14 @@ def main():
     data_directory = os.path.dirname(askopenfilename(title='Select Spotify Data Folder', filetypes=[('Any Spotify Data Json File', '.json')]))
 
     music_reader = StreamingHistoryMusicReader(data_directory)
-    most_played_artists = music_reader.sort_most_played_artists(True)
+    """most_played_artists = music_reader.sort_most_played_artists(True)
 
     for artist in most_played_artists:
         print(f'{artist.name} - {artist.songs_played} times played.')
+        """
+    most_listened_songs = music_reader.sort_listen_songs(True)
+    for song in most_listened_songs:
+        print(f'{song.title} - {song.ms_played}')
 
     sys.exit(1)
 
